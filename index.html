@@ -1,0 +1,982 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AIRPLAY — Holographic Instruments</title>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands/hands.js" crossorigin="anonymous"></script>
+<script>if(typeof Hands==='undefined'){document.write('<script src="https://unpkg.com/@mediapipe/hands@0.4.1646424915/hands.js" crossorigin="anonymous"><\/script>')}</script>
+<style>
+@import url('https://fonts.googleapis.com/css2?family=Orbitron:wght@400;700;900&family=Rajdhani:wght@300;400;600&display=swap');
+*,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
+:root{--bg:#04070f;--surface:#080d1a;--border:#0e1f3d;--cyan:#00f5ff;--magenta:#ff0077;--gold:#ffd000;--green:#00ff88;--text:#a8c4e0;--white:#e8f4ff}
+html,body{width:100%;height:100%;overflow:hidden;background:var(--bg);font-family:'Rajdhani',sans-serif;color:var(--white)}
+body::after{content:'';position:fixed;inset:0;pointer-events:none;z-index:9999;background:repeating-linear-gradient(0deg,transparent,transparent 2px,rgba(0,0,0,.07) 2px,rgba(0,0,0,.07) 4px)}
+.screen{position:absolute;inset:0;display:none;flex-direction:column;align-items:center;justify-content:center}
+.screen.active{display:flex!important}
+#bgCanvas{position:absolute;inset:0;width:100%;height:100%}
+.s1-header{position:relative;text-align:center;padding:36px 0 14px}
+.logo{font-family:'Orbitron',monospace;font-size:clamp(1.8rem,5vw,3.5rem);font-weight:900;letter-spacing:12px;background:linear-gradient(135deg,var(--cyan),var(--magenta));-webkit-background-clip:text;-webkit-text-fill-color:transparent;filter:drop-shadow(0 0 30px var(--cyan))}
+.sub{font-size:.78rem;letter-spacing:6px;color:var(--text);margin-top:5px;text-transform:uppercase}
+.grid{position:relative;display:grid;grid-template-columns:repeat(2,1fr);gap:18px;padding:14px 36px 22px;max-width:820px;width:100%}
+.card{background:rgba(8,13,26,.92);border:1px solid var(--border);padding:22px 18px;cursor:pointer;transition:all .3s;position:relative;overflow:hidden}
+.card::before{content:'';position:absolute;inset:0;opacity:0;transition:opacity .3s;background:radial-gradient(ellipse at top left,rgba(0,245,255,.06),transparent 60%)}
+.card:hover::before,.card.sel::before{opacity:1}
+.card:hover{border-color:rgba(0,245,255,.4);transform:translateY(-3px);box-shadow:0 8px 40px rgba(0,245,255,.1)}
+.card.sel{border-color:var(--cyan);box-shadow:0 0 30px rgba(0,245,255,.2),inset 0 0 20px rgba(0,245,255,.04)}
+.cn{position:absolute;width:12px;height:12px;border-color:var(--cyan);border-style:solid;opacity:0;transition:opacity .3s}
+.card.sel .cn,.card:hover .cn{opacity:1}
+.tl{top:6px;left:6px;border-width:2px 0 0 2px}.tr{top:6px;right:6px;border-width:2px 2px 0 0}
+.bl{bottom:6px;left:6px;border-width:0 0 2px 2px}.br{bottom:6px;right:6px;border-width:0 2px 2px 0}
+.ci{font-size:2.2rem;margin-bottom:9px;display:block}
+.cn2{font-family:'Orbitron',monospace;font-size:.85rem;font-weight:700;letter-spacing:3px;color:var(--white);margin-bottom:5px}
+.cd{font-size:.74rem;color:var(--text);line-height:1.6}
+.badge{display:inline-block;margin-top:7px;padding:3px 10px;border:1px solid;font-size:.58rem;letter-spacing:2px;text-transform:uppercase}
+.s1f{position:relative;padding-bottom:24px}
+.sbtn{font-family:'Orbitron',monospace;font-size:.78rem;font-weight:700;letter-spacing:5px;padding:13px 44px;background:transparent;border:2px solid var(--cyan);color:var(--cyan);cursor:pointer;text-transform:uppercase;transition:all .25s;box-shadow:0 0 20px rgba(0,245,255,.15)}
+.sbtn:hover:not(:disabled){background:var(--cyan);color:var(--bg);box-shadow:0 0 40px rgba(0,245,255,.5)}
+.sbtn:disabled{opacity:.3;cursor:default;border-color:var(--text);color:var(--text);box-shadow:none}
+/* S2 */
+#s2{background:var(--bg)}
+.slayout{display:flex;flex-direction:column;align-items:center;gap:13px;width:100%;height:100%;padding:13px}
+.sheader{text-align:center;padding:3px 0}
+.stitle{font-family:'Orbitron',monospace;font-size:1.2rem;letter-spacing:6px;color:var(--cyan)}
+.sstatus{font-size:.72rem;letter-spacing:3px;color:var(--text);margin-top:4px;min-height:18px;text-transform:uppercase}
+.svp{position:relative;flex:1;width:100%;max-width:820px;border:1px solid var(--border);overflow:hidden;background:#000}
+.svp video,.svp canvas{position:absolute;inset:0;width:100%;height:100%}
+.svp video{object-fit:cover;transform:scaleX(-1)}
+#scanCanvas{transform:none}
+.sce{position:absolute;width:30px;height:30px;border-color:var(--cyan);border-style:solid;z-index:5;transition:all .4s;opacity:.7}
+.sce.tl{top:10px;left:10px;border-width:2px 0 0 2px}.sce.tr{top:10px;right:10px;border-width:2px 2px 0 0}
+.sce.bl{bottom:10px;left:10px;border-width:0 0 2px 2px}.sce.br{bottom:10px;right:10px;border-width:0 2px 2px 0}
+.sce.found{border-color:var(--green);width:38px;height:38px;opacity:1}
+.sline{position:absolute;left:0;right:0;height:2px;background:linear-gradient(90deg,transparent,var(--cyan),transparent);animation:sa 2.5s linear infinite;z-index:4;opacity:.5}
+@keyframes sa{from{top:0%}to{top:100%}}
+.srow{display:flex;gap:14px;width:100%;max-width:820px}
+.sbox{flex:1;background:var(--surface);border:1px solid var(--border);padding:11px 14px}
+.sbl{font-size:.56rem;letter-spacing:3px;color:var(--text);text-transform:uppercase;margin-bottom:5px}
+.sbv{font-family:'Orbitron',monospace;font-size:.95rem;color:var(--cyan)}
+.hbars{display:flex;gap:11px;margin-top:4px}
+.hbw{flex:1}
+.hbl{font-size:.56rem;letter-spacing:2px;color:var(--text);margin-bottom:4px}
+.hbt{height:6px;background:var(--border);border-radius:3px;overflow:hidden}
+.hbf{height:100%;width:0%;border-radius:3px;transition:width .2s;background:var(--green)}
+/* S3 */
+#s3{background:var(--bg);text-align:center;gap:18px}
+.rring{width:150px;height:150px;border-radius:50%;border:3px solid var(--cyan);display:flex;align-items:center;justify-content:center;position:relative;box-shadow:0 0 60px rgba(0,245,255,.2);animation:rp 1.5s ease-in-out infinite}
+@keyframes rp{0%,100%{box-shadow:0 0 60px rgba(0,245,255,.2)}50%{box-shadow:0 0 100px rgba(0,245,255,.45)}}
+.rring::before{content:'';position:absolute;inset:-12px;border-radius:50%;border:1px solid rgba(0,245,255,.2);animation:rp 1.5s ease-in-out infinite .5s}
+.ri{font-size:3.2rem}
+.rt{font-family:'Orbitron',monospace;font-size:1.7rem;font-weight:900;letter-spacing:8px;color:var(--white)}
+.rn{font-family:'Orbitron',monospace;font-size:.78rem;letter-spacing:4px;color:var(--cyan)}
+.rtips{max-width:460px;background:var(--surface);border:1px solid var(--border);padding:16px 22px;text-align:left}
+.rtl{font-size:.56rem;letter-spacing:3px;color:var(--text);text-transform:uppercase;margin-bottom:9px}
+.rtip{font-size:.78rem;color:var(--text);line-height:1.8;padding-left:10px;border-left:2px solid var(--border);margin-bottom:5px}
+.rtip strong{color:var(--white)}
+.rcd{font-family:'Orbitron',monospace;font-size:2.8rem;font-weight:900;color:var(--cyan);min-height:52px;filter:drop-shadow(0 0 20px var(--cyan))}
+/* S4 */
+#s4{background:var(--bg);padding:0;align-items:stretch;justify-content:flex-start}
+.playout{display:flex;flex-direction:column;width:100%;height:100%}
+.ptop{display:flex;align-items:center;justify-content:space-between;padding:7px 18px;background:var(--surface);border-bottom:1px solid var(--border);flex-shrink:0;z-index:10}
+.pname{font-family:'Orbitron',monospace;font-size:.82rem;letter-spacing:4px;color:var(--cyan)}
+.pstats{display:flex;gap:22px}
+.pst{text-align:center}
+.pstl{font-size:.53rem;letter-spacing:2px;color:var(--text);text-transform:uppercase}
+.pstv{font-family:'Orbitron',monospace;font-size:.95rem;color:var(--white)}
+.pstage{position:relative;flex:1;overflow:hidden}
+#playVid{position:absolute;inset:0;width:100%;height:100%;object-fit:cover;transform:scaleX(-1);opacity:.2}
+#playC{position:absolute;inset:0;pointer-events:none}
+.bbtn{font-family:'Orbitron',monospace;font-size:.56rem;letter-spacing:3px;padding:6px 13px;background:transparent;border:1px solid var(--border);color:var(--text);cursor:pointer;transition:all .2s;text-transform:uppercase}
+.bbtn:hover{border-color:var(--magenta);color:var(--magenta)}
+/* HTTPS warning */
+#hw{display:none;position:fixed;inset:0;z-index:99990;background:rgba(4,7,15,.97);flex-direction:column;align-items:center;justify-content:center;gap:14px;text-align:center;padding:36px}
+#hw.on{display:flex}
+.wt{font-family:'Orbitron',monospace;font-size:1.3rem;letter-spacing:6px;color:var(--magenta)}
+.wb{max-width:500px;font-size:.82rem;color:var(--text);line-height:1.9}
+.wc{background:var(--surface);border:1px solid var(--border);padding:12px 22px;font-family:'Orbitron',monospace;font-size:.72rem;color:var(--cyan);letter-spacing:2px;margin:3px 0}
+.wd{font-family:'Orbitron',monospace;font-size:.68rem;letter-spacing:4px;padding:9px 26px;background:transparent;border:1px solid var(--magenta);color:var(--magenta);cursor:pointer;margin-top:6px}
+.wd:hover{background:var(--magenta);color:var(--bg)}
+.ldots::after{content:'...';animation:ld 1.2s steps(4,end) infinite}
+@keyframes ld{0%,20%{content:'.'}40%{content:'..'}60%,100%{content:'...'}}
+</style>
+</head>
+<body>
+
+<div id="hw">
+  <div class="wt">⚠ CAMERA BLOCKED</div>
+  <div class="wb">Browsers block camera access when opening files directly (<code>file://</code>).<br><br>
+    Open a terminal in the folder containing this file and run:</div>
+  <div class="wc">python3 -m http.server 8080</div>
+  <div class="wb" style="font-size:.76rem">Then open <strong style="color:var(--cyan)">http://localhost:8080/air-instruments.html</strong> in Chrome.<br>
+    <span style="font-size:.7rem">No Python? Use VS Code Live Server, or any local web server.</span></div>
+  <button class="wd" onclick="document.getElementById('hw').classList.remove('on')">TRY ANYWAY</button>
+</div>
+
+<!-- ═══ S1: SELECT ═══ -->
+<div id="s1" class="screen active">
+  <canvas id="bgCanvas"></canvas>
+  <div class="s1-header">
+    <div class="logo">AIRPLAY</div>
+    <div class="sub">Holographic Instrument Experience</div>
+  </div>
+  <div class="grid">
+    <div class="card" onclick="pick('drums',this)">
+      <div class="cn tl"></div><div class="cn tr"></div><div class="cn bl"></div><div class="cn br"></div>
+      <span class="ci">🥁</span>
+      <div class="cn2">Air Drums</div>
+      <div class="cd">Strike holographic pads with downward motions. Hi-hat, Snare, Toms & Kick.</div>
+      <div class="badge" style="border-color:var(--cyan);color:var(--cyan)">Beginner Friendly</div>
+    </div>
+    <div class="card" onclick="pick('harp',this)">
+      <div class="cn tl"></div><div class="cn tr"></div><div class="cn bl"></div><div class="cn br"></div>
+      <span class="ci">🎵</span>
+      <div class="cn2">Laser Harp</div>
+      <div class="cd">Sweep fingertips through vertical laser strings. Lean closer for reverb depth.</div>
+      <div class="badge" style="border-color:var(--magenta);color:var(--magenta)">Depth-Sensitive</div>
+    </div>
+    <div class="card" onclick="pick('guitar',this)">
+      <div class="cn tl"></div><div class="cn tr"></div><div class="cn bl"></div><div class="cn br"></div>
+      <span class="ci">🎸</span>
+      <div class="cn2">Air Guitar</div>
+      <div class="cd">Left pinch = chord (C G D Am). Right hand strum. Both tracked live.</div>
+      <div class="badge" style="border-color:var(--gold);color:var(--gold)">Dual Hand</div>
+    </div>
+    <div class="card" onclick="pick('piano',this)">
+      <div class="cn tl"></div><div class="cn tr"></div><div class="cn bl"></div><div class="cn br"></div>
+      <span class="ci">🎹</span>
+      <div class="cn2">Pinch Piano</div>
+      <div class="cd">Each finger plays a note when pinched to thumb. Ten keys, two hands.</div>
+      <div class="badge" style="border-color:var(--green);color:var(--green)">Precision Play</div>
+    </div>
+  </div>
+  <div class="s1f">
+    <button class="sbtn" id="s1b" onclick="goScan()" disabled>SELECT AN INSTRUMENT</button>
+  </div>
+</div>
+
+<!-- ═══ S2: SCAN ═══ -->
+<div id="s2" class="screen">
+  <div class="slayout">
+    <div class="sheader">
+      <div class="stitle">HAND CALIBRATION</div>
+      <div class="sstatus" id="ss">Starting camera<span class="ldots"></span></div>
+    </div>
+    <div class="svp" id="svp">
+      <video id="scanVid" autoplay playsinline muted></video>
+      <canvas id="scanC"></canvas>
+      <div class="sce tl" id="cTL"></div><div class="sce tr" id="cTR"></div>
+      <div class="sce bl" id="cBL"></div><div class="sce br" id="cBR"></div>
+      <div class="sline"></div>
+    </div>
+    <div class="srow">
+      <div class="sbox"><div class="sbl">Camera</div><div class="sbv" id="camSt">—</div></div>
+      <div class="sbox" style="flex:2">
+        <div class="sbl">Detection Confidence</div>
+        <div class="hbars">
+          <div class="hbw"><div class="hbl">LEFT</div><div class="hbt"><div class="hbf" id="lBar"></div></div></div>
+          <div class="hbw"><div class="hbl">RIGHT</div><div class="hbt"><div class="hbf" id="rBar"></div></div></div>
+        </div>
+      </div>
+      <div class="sbox"><div class="sbl">Hands</div><div class="sbv" style="color:var(--green)" id="hCount">0 / 2</div></div>
+      <div class="sbox"><div class="sbl">Instrument</div><div class="sbv" style="color:var(--magenta)" id="sInst">—</div></div>
+    </div>
+  </div>
+</div>
+
+<!-- ═══ S3: READY ═══ -->
+<div id="s3" class="screen">
+  <div class="rring"><span class="ri" id="rIcon">🥁</span></div>
+  <div class="rt">CALIBRATED</div>
+  <div class="rn" id="rName">AIR DRUMS</div>
+  <div class="rtips" id="rTips"></div>
+  <div class="rcd" id="rCd"></div>
+</div>
+
+<!-- ═══ S4: PLAY ═══ -->
+<div id="s4" class="screen">
+  <div class="playout">
+    <div class="ptop">
+      <div class="pname" id="pName">AIR DRUMS</div>
+      <div class="pstats">
+        <div class="pst"><div class="pstl">Notes</div><div class="pstv" id="sN">0</div></div>
+        <div class="pst"><div class="pstl">Streak</div><div class="pstv" id="sS">0</div></div>
+        <div class="pst"><div class="pstl">Hands</div><div class="pstv" id="sH">0</div></div>
+      </div>
+      <div style="display:flex;align-items:center;gap:10px">
+        <div style="text-align:center">
+          <div style="font-size:.52rem;letter-spacing:2px;color:var(--text);text-transform:uppercase;margin-bottom:3px">Sensitivity</div>
+          <input type="range" id="sensBar" min="1" max="10" value="5"
+            style="-webkit-appearance:none;width:90px;height:3px;background:var(--border);border-radius:2px;cursor:pointer;outline:none"
+            oninput="SENS=parseInt(this.value);document.getElementById('sensVal').textContent=this.value">
+          <div style="font-family:Orbitron,monospace;font-size:.7rem;color:var(--cyan);margin-top:2px" id="sensVal">5</div>
+        </div>
+        <button class="bbtn" onclick="goBack()">◀ CHANGE</button>
+      </div>
+    </div>
+    <div class="pstage">
+      <video id="playVid" autoplay playsinline muted></video>
+      <canvas id="playC"></canvas>
+    </div>
+  </div>
+</div>
+
+<script>
+'use strict';
+if(location.protocol==='file:') document.getElementById('hw').classList.add('on');
+// Unlock audio on first user interaction (required by browsers)
+document.addEventListener('click', ()=>{ if(!AC){AC=new(window.AudioContext||window.webkitAudioContext)();}else{AC.resume();} }, {once:false});
+document.addEventListener('keydown', ()=>{ if(!AC){AC=new(window.AudioContext||window.webkitAudioContext)();}else{AC.resume();} }, {once:false});
+
+
+// ── AUDIO ──────────────────────────────────────────────
+let AC;
+function ac(){if(!AC)AC=new(window.AudioContext||window.webkitAudioContext)();if(AC.state==='suspended')AC.resume();return AC;}
+const getAC=ac; // alias
+function drum(freq,dec,noise=0,vol=.85){
+  const a=ac(),n=a.currentTime,o=a.createOscillator(),g=a.createGain();
+  o.type='sine';o.frequency.setValueAtTime(freq,n);o.frequency.exponentialRampToValueAtTime(freq*.15,n+dec);
+  g.gain.setValueAtTime(vol,n);g.gain.exponentialRampToValueAtTime(.001,n+dec);
+  o.connect(g);g.connect(a.destination);o.start(n);o.stop(n+dec+.05);
+  if(noise>0){const sz=~~(a.sampleRate*.15),b=a.createBuffer(1,sz,a.sampleRate),d=b.getChannelData(0);
+    for(let i=0;i<sz;i++)d[i]=(Math.random()*2-1)*noise;
+    const s=a.createBufferSource(),ng=a.createGain();s.buffer=b;
+    ng.gain.setValueAtTime(vol*.7,n);ng.gain.exponentialRampToValueAtTime(.001,n+.1);
+    s.connect(ng);ng.connect(a.destination);s.start(n);}
+}
+// Dedicated tom sound — pitched, resonant, longer decay
+function tom(freq,vol=.85){
+  const a=ac(),n=a.currentTime;
+  // Main tone
+  const o=a.createOscillator(),g=a.createGain();
+  o.type='sine';
+  o.frequency.setValueAtTime(freq*1.5,n);
+  o.frequency.exponentialRampToValueAtTime(freq,n+.02);
+  o.frequency.exponentialRampToValueAtTime(freq*.5,n+.35);
+  g.gain.setValueAtTime(vol,n);
+  g.gain.exponentialRampToValueAtTime(.001,n+.45);
+  o.connect(g);g.connect(a.destination);o.start(n);o.stop(n+.5);
+  // Body noise
+  const sz=~~(a.sampleRate*.08),buf=a.createBuffer(1,sz,a.sampleRate),d=buf.getChannelData(0);
+  for(let i=0;i<sz;i++)d[i]=(Math.random()*2-1);
+  const s=a.createBufferSource(),f=a.createBiquadFilter(),ng=a.createGain();
+  s.buffer=buf;f.type='bandpass';f.frequency.value=freq*2;f.Q.value=1.5;
+  ng.gain.setValueAtTime(vol*.5,n);ng.gain.exponentialRampToValueAtTime(.001,n+.08);
+  s.connect(f);f.connect(ng);ng.connect(a.destination);s.start(n);
+}
+function hat(open=false,vol=.45){
+  const a=ac(),n=a.currentTime,dec=open?.4:.07,sz=~~(a.sampleRate*dec),b=a.createBuffer(1,sz,a.sampleRate),d=b.getChannelData(0);
+  for(let i=0;i<sz;i++)d[i]=Math.random()*2-1;
+  const s=a.createBufferSource(),f=a.createBiquadFilter(),g=a.createGain();
+  s.buffer=b;f.type='highpass';f.frequency.value=7500;
+  g.gain.setValueAtTime(vol,n);g.gain.exponentialRampToValueAtTime(.001,n+dec);
+  s.connect(f);f.connect(g);g.connect(a.destination);s.start(n);
+}
+function note(freq,dur=.5,vol=.5,rev=0){
+  const a=ac(),n=a.currentTime,o=a.createOscillator(),g=a.createGain();
+  o.type='triangle';o.frequency.value=freq;
+  g.gain.setValueAtTime(vol,n);g.gain.exponentialRampToValueAtTime(.001,n+dur);
+  o.connect(g);g.connect(a.destination);o.start(n);o.stop(n+dur+.1);
+  if(rev>.1){const sz=~~(a.sampleRate*(dur+rev*.5)),b=a.createBuffer(1,sz,a.sampleRate),d=b.getChannelData(0);
+    for(let i=0;i<sz;i++)d[i]=(Math.random()*2-1)*Math.exp(-i/(a.sampleRate*.25))*rev*.4;
+    const cv=a.createConvolver(),rg=a.createGain();cv.buffer=b;rg.gain.value=.3;
+    g.connect(cv);cv.connect(rg);rg.connect(a.destination);}
+}
+function chord(freqs,dur=.7,vol=.28){freqs.forEach(f=>note(f,dur,vol));}
+function beep(f,v=.13){const a=ac(),o=a.createOscillator(),g=a.createGain();o.frequency.value=f;g.gain.value=v;o.connect(g);g.connect(a.destination);o.start();o.stop(a.currentTime+.1);}
+
+// ── STATE ──────────────────────────────────────────────
+let inst=null,stream=null,hands=null,mpOn=false;
+let LM=[],HS=[];
+let scanF={l:0,r:0},scanDone=false;
+let notes=0,streak=0,lastT=0;
+let fx=[],iSt={},PW=0,PH=0,looping=false;
+
+// ── BG PARTICLES ──────────────────────────────────────
+(()=>{
+  const c=document.getElementById('bgCanvas'),g=c.getContext('2d');
+  let W,H,pts=[];
+  const rsz=()=>{W=c.width=c.offsetWidth;H=c.height=c.offsetHeight;
+    pts=Array.from({length:65},()=>({x:Math.random()*W,y:Math.random()*H,vx:(Math.random()-.5)*.28,vy:(Math.random()-.5)*.28,r:Math.random()*1.1+.4}))};
+  window.addEventListener('resize',rsz);rsz();
+  const draw=()=>{g.clearRect(0,0,W,H);
+    for(const p of pts){p.x=(p.x+p.vx+W)%W;p.y=(p.y+p.vy+H)%H;g.beginPath();g.arc(p.x,p.y,p.r,0,Math.PI*2);g.fillStyle='rgba(0,245,255,.2)';g.fill();}
+    for(let i=0;i<pts.length;i++)for(let j=i+1;j<pts.length;j++){const dx=pts[i].x-pts[j].x,dy=pts[i].y-pts[j].y,d=Math.hypot(dx,dy);
+      if(d<85){g.beginPath();g.moveTo(pts[i].x,pts[i].y);g.lineTo(pts[j].x,pts[j].y);g.strokeStyle=`rgba(0,245,255,${.09*(1-d/85)})`;g.lineWidth=.4;g.stroke();}}
+    requestAnimationFrame(draw);};draw();
+})();
+
+// ── SCREENS ───────────────────────────────────────────
+function show(id){document.querySelectorAll('.screen').forEach(s=>s.classList.remove('active'));document.getElementById(id).classList.add('active');}
+function pick(id,el){inst=id;document.querySelectorAll('.card').forEach(c=>c.classList.remove('sel'));el.classList.add('sel');const b=document.getElementById('s1b');b.disabled=false;b.textContent='LAUNCH '+id.toUpperCase();}
+
+// ── SCAN ──────────────────────────────────────────────
+async function goScan(){
+  ac();show('s2');
+  document.getElementById('sInst').textContent=inst.toUpperCase();
+  scanF={l:0,r:0};scanDone=false;
+  const vp=document.getElementById('svp'),sc=document.getElementById('scanC');
+  const rsz=()=>{sc.width=vp.offsetWidth;sc.height=vp.offsetHeight;};rsz();
+  new ResizeObserver(rsz).observe(vp);
+  try{
+    if(stream)stream.getTracks().forEach(t=>t.stop());
+    stream=await navigator.mediaDevices.getUserMedia({video:{width:{ideal:1280},height:{ideal:720},facingMode:'user'}});
+    const sv=document.getElementById('scanVid');
+    sv.srcObject=stream;
+    document.getElementById('playVid').srcObject=stream;
+    document.getElementById('camSt').textContent='ONLINE';
+    document.getElementById('camSt').style.color='var(--green)';
+    document.getElementById('ss').textContent='Raise both hands into view';
+    if(!mpOn)startMP(sv);
+  }catch(e){
+    console.error(e);
+    document.getElementById('camSt').textContent='BLOCKED';
+    document.getElementById('camSt').style.color='var(--magenta)';
+    document.getElementById('ss').textContent=e.name==='NotAllowedError'?'Permission denied — allow camera in browser settings':e.name==='NotFoundError'?'No camera detected':'Error: '+e.message;
+    if(location.protocol==='file:')document.getElementById('hw').classList.add('on');
+  }
+}
+
+// ── MEDIAPIPE ─────────────────────────────────────────
+function startMP(videoEl){
+  mpOn=true;
+  // Use unpkg CDN for WASM files — most reliable across all hosting platforms
+  hands=new Hands({locateFile:f=>`https://unpkg.com/@mediapipe/hands@0.4.1646424915/${f}`});
+  hands.setOptions({maxNumHands:2,modelComplexity:1,minDetectionConfidence:.55,minTrackingConfidence:.45});
+  hands.onResults(onHands);
+  document.getElementById('ss').textContent='Loading hand tracking model…';
+  hands.initialize().then(()=>{
+    document.getElementById('ss').textContent='Raise both hands into view';
+    let active=true;
+    function loop(){
+      if(!active)return;
+      if(videoEl.readyState>=2&&videoEl.videoWidth>0){hands.send({image:videoEl}).catch(()=>{});}
+      requestAnimationFrame(loop);
+    }
+    loop();
+  }).catch(e=>{console.error('MP init',e);mpOn=false;});
+}
+
+function onHands(r){
+  LM=r.multiHandLandmarks||[];HS=r.multiHandedness||[];
+  document.getElementById('sH').textContent=LM.length;
+  if(document.getElementById('s2').classList.contains('active'))doScan();
+}
+
+function getSide(i){return((HS[i]?.label||'Right').toLowerCase()==='left'?'right':'left');}
+
+function doScan(){
+  if(scanDone)return;
+  const sc=document.getElementById('scanC');
+  const vp=document.getElementById('scanVP');
+  // Always keep canvas resolution in sync with its display size
+  if(sc.width!==vp.offsetWidth||sc.height!==vp.offsetHeight){
+    sc.width=vp.offsetWidth;
+    sc.height=vp.offsetHeight;
+  }
+  const g=sc.getContext('2d'),W=sc.width,H=sc.height;
+  g.clearRect(0,0,W,H);
+  let lF=false,rF=false;
+  for(let i=0;i<LM.length;i++){
+    const side=getSide(i);
+    drawSkelScan(g,LM[i],W,H,side==='left'?'#00f5ff':'#ff0077');
+    if(side==='left')lF=true;else rF=true;
+  }
+  if(lF)scanF.l=Math.min(scanF.l+2,60);else scanF.l=Math.max(scanF.l-3,0);
+  if(rF)scanF.r=Math.min(scanF.r+2,60);else scanF.r=Math.max(scanF.r-3,0);
+  document.getElementById('lBar').style.width=(scanF.l/60*100)+'%';
+  document.getElementById('rBar').style.width=(scanF.r/60*100)+'%';
+  const tot=(lF?1:0)+(rF?1:0);
+  document.getElementById('hCount').textContent=tot+' / 2';
+  ['cTL','cTR','cBL','cBR'].forEach(id=>{const el=document.getElementById(id);const c=id.slice(1).toLowerCase();el.className='sce '+c+(tot===2?' found':'');});
+  if(tot===0)document.getElementById('ss').textContent='Raise both hands into the camera view';
+  else if(tot===1)document.getElementById('ss').textContent='One hand found — show the other too';
+  else document.getElementById('ss').textContent='Both hands detected — hold still…';
+  if(scanF.l>=50&&scanF.r>=50){scanDone=true;document.getElementById('ss').textContent='Calibration complete!';setTimeout(goReady,700);}
+}
+
+function drawSkelScan(g,lm,W,H,col){
+  // Video is mirrored via CSS scaleX(-1), so skeleton must also mirror (1-x)
+  const pts=lm.map(l=>({x:(1-l.x)*W,y:l.y*H}));
+  const C=[[0,1],[1,2],[2,3],[3,4],[0,5],[5,6],[6,7],[7,8],[5,9],[9,10],[10,11],[11,12],[9,13],[13,14],[14,15],[15,16],[13,17],[17,18],[18,19],[19,20],[0,17]];
+  g.save();
+  g.strokeStyle=col+'aa';g.lineWidth=2;
+  for(const[a,b]of C){g.beginPath();g.moveTo(pts[a].x,pts[a].y);g.lineTo(pts[b].x,pts[b].y);g.stroke();}
+  for(let i=0;i<pts.length;i++){
+    const r=[4,8,12,16,20].includes(i)?6:3;
+    g.beginPath();g.arc(pts[i].x,pts[i].y,r,0,Math.PI*2);
+    g.fillStyle=[4,8,12,16,20].includes(i)?col:'#ffffffaa';g.fill();
+    if([4,8,12,16,20].includes(i)){
+      g.beginPath();g.arc(pts[i].x,pts[i].y,10,0,Math.PI*2);
+      g.strokeStyle=col+'66';g.lineWidth=1.5;g.stroke();
+    }
+  }
+  g.restore();
+}
+
+// ── READY ─────────────────────────────────────────────
+const INFO={
+  drums:{icon:'🥁',name:'AIR DRUMS',tips:['<strong>Strike DOWN</strong> into glowing pads to trigger sounds','<strong>Speed matters</strong> — quick downward flick = hit','Kick at bottom centre, crash cymbals at top corners']},
+  harp:{icon:'🎵',name:'LASER HARP',tips:['<strong>Sweep index finger</strong> through vertical strings','<strong>Lean closer to camera</strong> to add reverb','Strings glow as your hand nears them']},
+  guitar:{icon:'🎸',name:'AIR GUITAR',tips:['<strong>Left pinch</strong>: thumb+index=C, +middle=G, +ring=D, +pinky=Am','<strong>Right sweep</strong>: fast horizontal swipe in the strum zone','Hold chord first, then strum for sound']},
+  piano:{icon:'🎹',name:'PINCH PIANO',tips:['<strong>Pinch each finger to thumb</strong> to play','Left hand: C D E F G — Right: A B C D E (octave up)','Quick pinch and release = clean note']}
+};
+
+function goReady(){
+  const info=INFO[inst];
+  document.getElementById('rIcon').textContent=info.icon;
+  document.getElementById('rName').textContent=info.name;
+  document.getElementById('rTips').innerHTML='<div class="rtl">How to Play</div>'+info.tips.map(t=>`<div class="rtip">${t}</div>`).join('');
+  show('s3');
+  let n=3;const cd=document.getElementById('rCd');cd.textContent=n;beep(600);
+  const iv=setInterval(()=>{n--;if(n>0){cd.textContent=n;beep(600);}else{clearInterval(iv);cd.textContent='GO!';beep(1000,.22);setTimeout(goPlay,650);}},1000);
+}
+
+// ── PLAY ──────────────────────────────────────────────
+const pC=document.getElementById('playC'),pG=pC.getContext('2d');
+
+function goPlay(){
+  show('s4');document.getElementById('pName').textContent=INFO[inst].name;
+  notes=0;streak=0;document.getElementById('sN').textContent='0';document.getElementById('sS').textContent='0';
+  // delay so the screen is fully visible before we measure canvas size
+  setTimeout(()=>{
+    resizeP();
+    new ResizeObserver(resizeP).observe(pC.parentElement);
+    initInst();
+    if(!looping){looping=true;pLoop();}
+  },100);
+}
+
+function resizeP(){
+  const parent=pC.parentElement;
+  PW=pC.width=parent.offsetWidth||window.innerWidth;
+  PH=pC.height=parent.offsetHeight||window.innerHeight-44;
+  if(PW>0&&PH>0)initInst();
+}
+
+function goBack(){
+  scanDone=false;scanF={l:0,r:0};
+  document.getElementById('lBar').style.width='0%';
+  document.getElementById('rBar').style.width='0%';
+  stopGuitarOscs();
+  show('s1');
+}
+
+// ── INSTRUMENTS ───────────────────────────────────────
+function initInst(){fx=[];iSt={};
+  if(inst==='drums')initDrums();
+  else if(inst==='harp')initHarp();
+  else if(inst==='guitar'){if(inst!=='guitar')stopGuitarOscs();initGuitar();}
+  else if(inst==='piano')initPiano();
+}
+
+// DRUMS
+function initDrums(){
+  iSt.pads=[
+    {x:.1, y:.15,rx:.09,ry:.044,col:'#ff8800',lbl:'CRASH',   snd:()=>hat(true,.3)},
+    {x:.28,y:.20,rx:.07,ry:.036,col:'#00f5ff',lbl:'HI-HAT',  snd:()=>hat(false,.4)},
+    {x:.72,y:.20,rx:.07,ry:.036,col:'#0099ff',lbl:'OPEN HAT',snd:()=>hat(true,.44)},
+    {x:.9, y:.15,rx:.09,ry:.044,col:'#ff8800',lbl:'CRASH',   snd:()=>hat(true,.3)},
+    {x:.3, y:.37,rx:.1, ry:.065,col:'#aa44ff',lbl:'TOM 1',   snd:()=>tom(150,.9)},
+    {x:.7, y:.37,rx:.1, ry:.065,col:'#44ffaa',lbl:'TOM 2',   snd:()=>tom(100,.9)},
+    {x:.25,y:.65,rx:.11,ry:.068,col:'#ffd000',lbl:'SNARE',   snd:()=>drum(200,.14,.9,.85)},
+    {x:.75,y:.65,rx:.11,ry:.068,col:'#ff2d6b',lbl:'RIM',     snd:()=>drum(900,.07,.1,.7)},
+    {x:.5, y:.83,rx:.14,ry:.072,col:'#ff2d6b',lbl:'KICK',    snd:()=>drum(75,.5,.3,.9)},
+  ].map(p=>({...p,g:0,cd:0}));
+  iSt.pY={l:null,r:null};iSt.vY={l:0,r:0};
+}
+let SENS=5;
+function updDrums(){
+  for(const p of iSt.pads)p.g=Math.max(0,p.g-.04);
+  if(!iSt.stickTip)iSt.stickTip={l:{x:-999,y:-999},r:{x:-999,y:-999}};
+  for(let i=0;i<LM.length;i++){
+    const side=getSide(i),lm=LM[i],sk=side==='left'?'l':'r';
+    const wrist=lm[0],mTip=lm[12];
+    const wx=(1-wrist.x)*PW,wy=wrist.y*PH;
+    const tx=(1-mTip.x)*PW,ty=mTip.y*PH;
+    const dx=tx-wx,dy=ty-wy,len=Math.hypot(dx,dy)||1;
+    // stick tip extends beyond fingertip
+    const ex=tx+(dx/len)*PH*0.09, ey=ty+(dy/len)*PH*0.09;
+    iSt.stickTip[sk]={x:ex,y:ey};
+    const prevY=iSt.pY[sk];
+    const vy=prevY!==null?ey-prevY:0;
+    const thresh=22-(SENS*2);
+    if(vy>thresh){
+      if(AC&&AC.state==='suspended')AC.resume();
+      for(const p of iSt.pads){
+        if(Date.now()-p.cd<250)continue;
+        const pdx=(ex-p.x*PW)/(p.rx*PW*1.4),pdy=(ey-p.y*PH)/(p.ry*PH*1.4);
+        if(pdx*pdx+pdy*pdy<1){
+          const doPlay=()=>{p.snd();p.g=1;p.cd=Date.now();addFX(p.x*PW,p.y*PH,p.rx*PW,p.ry*PH,p.col);hit();};
+          if(!AC||AC.state==='suspended'){getAC();setTimeout(doPlay,50);}else{doPlay();}
+        }
+      }
+    }
+    iSt.vY[sk]=vy;iSt.pY[sk]=ey;
+  }
+}
+function drwDrums(){
+  for(const p of iSt.pads){
+    const cx=p.x*PW,cy=p.y*PH,rx=p.rx*PW,ry=p.ry*PH,g=p.g;
+    pG.save();pG.shadowColor=p.col;pG.shadowBlur=16+g*52;
+    pG.beginPath();pG.ellipse(cx,cy,rx,ry,0,0,Math.PI*2);
+    const gr=pG.createRadialGradient(cx,cy-ry*.3,2,cx,cy,rx);
+    gr.addColorStop(0,p.col+hx((.11+g*.37)*255));gr.addColorStop(1,p.col+hx((.03+g*.11)*255));
+    pG.fillStyle=gr;pG.fill();
+    pG.beginPath();pG.ellipse(cx,cy,rx+4,ry+3,0,0,Math.PI*2);
+    pG.strokeStyle=p.col+hx((.27+g*.73)*255);pG.lineWidth=1.5+g*2.5;pG.stroke();pG.restore();
+    pG.font=`bold ${9+~~(g*3)}px Orbitron,monospace`;pG.fillStyle=p.col+hx((.48+g*.52)*255);
+    pG.textAlign='center';pG.textBaseline='middle';pG.fillText(p.lbl,cx,cy);
+  }
+}
+
+// HARP
+const HN=[261.6,293.7,329.6,349.2,392,440,493.9,523.3,587.3,659.3,698.5,783.1];
+const HC=['#ff0077','#ff4400','#ffd000','#44ff88','#00f5ff','#0077ff','#aa44ff','#ff0077','#ff4400','#ffd000','#44ff88','#00f5ff'];
+const HNN=['C','D','E','F','G','A','B','C','D','E','F','G'];
+function initHarp(){iSt.strings=HN.map((f,i)=>({f,col:HC[i],x:(i+1)/(HN.length+1),g:0,cd:0,lx:{l:null,r:null}}));}
+function updHarp(){
+  for(const s of iSt.strings)s.g=Math.max(0,s.g-.024);
+  for(let i=0;i<LM.length;i++){
+    const side=getSide(i),lm=LM[i],tip=lm[8];
+    const tx=1-tip.x,rev=Math.max(0,Math.min(1,-tip.z*4));
+    const k=side==='left'?'l':'r';
+    for(const s of iSt.strings){
+      const lx=s.lx[k];
+      if(lx!==null&&((lx<s.x&&tx>=s.x)||(lx>s.x&&tx<=s.x))&&Date.now()-s.cd>175){
+        s.g=1;s.cd=Date.now();note(s.f,.4+rev*.5,.44,rev);addFX(s.x*PW,tip.y*PH,PW*.012,PH*.38,s.col);hit();
+      }
+      s.lx[k]=tx;const d=Math.abs(tx-s.x)*PW;if(d<48)s.g=Math.max(s.g,(1-d/48)*.62);
+    }
+  }
+}
+function drwHarp(){
+  for(let i=0;i<iSt.strings.length;i++){
+    const s=iSt.strings[i],sx=s.x*PW,g=s.g;
+    const gr=pG.createLinearGradient(sx,0,sx,PH*.92);
+    gr.addColorStop(0,s.col+'00');gr.addColorStop(.08,s.col+hx((.43+g*.57)*255));
+    gr.addColorStop(.92,s.col+hx((.43+g*.57)*255));gr.addColorStop(1,s.col+'00');
+    pG.save();pG.shadowColor=s.col;pG.shadowBlur=5+g*26;
+    pG.beginPath();pG.moveTo(sx,PH*.04);pG.lineTo(sx,PH*.92);
+    pG.strokeStyle=gr;pG.lineWidth=1.2+g*2.8;pG.stroke();pG.restore();
+    pG.font='bold 9px Orbitron,monospace';pG.fillStyle=s.col+hx((.32+g*.68)*255);
+    pG.textAlign='center';pG.fillText(HNN[i],sx,PH*.97);
+  }
+  tip('SWEEP INDEX FINGER THROUGH STRINGS — LEAN CLOSER FOR REVERB');
+}
+
+// ═══ GUITAR — continuous flowing strum ═══
+const CHRD={
+  C:{n:'C',f:[261.6,329.6,392,523.3],c:'#ffd000'},
+  G:{n:'G',f:[196,246.9,392,587.3],  c:'#00f5ff'},
+  D:{n:'D',f:[293.7,370,440,587.3],  c:'#ff0077'},
+  Am:{n:'Am',f:[220,261.6,329.6,440],c:'#aa44ff'}
+};
+const CM=['C','G','D','Am'];
+
+// Continuous oscillators for each chord note — fade in/out with strum speed
+let guitarOscs=[];
+function stopGuitarOscs(){
+  guitarOscs.forEach(({g,o})=>{try{g.gain.setValueAtTime(g.gain.value,AC.currentTime);g.gain.linearRampToValueAtTime(0,AC.currentTime+.15);setTimeout(()=>{try{o.stop();}catch(e){}},200);}catch(e){}});
+  guitarOscs=[];
+}
+function startGuitarOscs(freqs){
+  stopGuitarOscs();
+  const a=ac();
+  guitarOscs=freqs.map(freq=>{
+    const o=a.createOscillator(),g=a.createGain();
+    o.type='triangle';o.frequency.value=freq;
+    g.gain.value=0;
+    o.connect(g);g.connect(a.destination);
+    o.start();
+    return {o,g,freq};
+  });
+}
+function setGuitarVol(vol){
+  guitarOscs.forEach(({g})=>{
+    try{g.gain.setTargetAtTime(Math.min(vol,.35),AC.currentTime,.04);}catch(e){}
+  });
+}
+
+function updGuitar(){
+  iSt.cg=Math.max(0,iSt.cg-.02);
+  iSt.strumVol=Math.max(0,iSt.strumVol-.03);
+  iSt.handY=iSt.handY||null;
+
+  for(let i=0;i<LM.length;i++){
+    const side=getSide(i),lm=LM[i];
+
+    // LEFT hand — chord via pinch, smooth crossfade oscillators
+    if(side==='left'){
+      const c=pinchChord(lm);
+      if(c&&c!==iSt.ch){
+        iSt.ch=c;iSt.cg=1;
+        // Smoothly retune existing oscillators to new chord freqs
+        const freqs=buildStringFreqs(c);
+        const a=ac();
+        guitarOscs.forEach(({o},idx)=>{
+          if(freqs[idx])try{o.frequency.setTargetAtTime(freqs[idx],a.currentTime,.05);}catch(e){}
+        });
+      } else if(c){
+        iSt.cg=Math.max(iSt.cg,.6);
+      }
+    }
+
+    // RIGHT hand — strum, each string gets volume by proximity to hand Y
+    if(side==='right'){
+      const w=lm[0];
+      const sx=(1-w.x)*PW, sy=w.y*PH;
+      iSt.handY=sy;
+      if(iSt.px!==null){
+        const vx=Math.abs(sx-iSt.px);
+        const speed=Math.min(vx/6,1); // normalised 0-1
+        if(speed>0.015){
+          iSt.strumVol=Math.min(iSt.strumVol+speed*.5,.35);
+          // Per-string volume: loudest where hand Y aligns with that string
+          if(guitarOscs.length===6){
+            const a=ac();
+            for(let s=0;s<6;s++){
+              const strY=PH*(0.22+s*(0.52/6));
+              const dist=Math.abs(sy-strY);
+              const prox=Math.max(0,1-dist/(PH*.11));
+              const sv=iSt.strumVol*prox*1.3;
+              try{guitarOscs[s].g.gain.setTargetAtTime(Math.min(sv,.35),a.currentTime,.025);}catch(e){}
+            }
+          }
+          hit();
+        } else {
+          // Hand slow/stopped — fade all strings out
+          if(guitarOscs.length===6){
+            const a=ac();
+            guitarOscs.forEach(({g:gn})=>{try{gn.gain.setTargetAtTime(0,a.currentTime,.08);}catch(e){}});
+          }
+        }
+      }
+      iSt.px=sx;
+    }
+  }
+
+  // No right hand — silence
+  if(!LM.some((_,i)=>getSide(i)==='right')){
+    iSt.strumVol=Math.max(0,iSt.strumVol-.05);
+    if(guitarOscs.length){
+      const a=ac();
+      guitarOscs.forEach(({g:gn})=>{try{gn.gain.setTargetAtTime(0,a.currentTime,.1);}catch(e){}});
+    }
+    iSt.px=null;
+    iSt.handY=null;
+  }
+}
+
+function buildStringFreqs(chName){
+  const f=CHRD[chName].f;
+  // 6 strings low→high, each a distinct note
+  return[f[0]*.5, f[0], f[1], f[2], f[3]*.75, f[3]];
+}
+
+function initGuitar(){
+  iSt.ch='G';iSt.px=null;iSt.vx=0;iSt.cg=0;iSt.sg=0;iSt.strumVol=0;iSt.handY=null;
+  startGuitarOscs(buildStringFreqs('G'));
+}
+function drwGuitar(){
+  const nStrings=6;
+  const ch=CHRD[iSt.ch||'G'];
+
+  // Strings always visible at base opacity, brighten when strumming nearby
+  for(let i=0;i<nStrings;i++){
+    const sy=PH*(0.22+i*(0.52/nStrings));
+    let bright=0.18; // always visible base
+    if(iSt.strumVol>0&&iSt.handY!=null){
+      const dist=Math.abs(iSt.handY-sy);
+      const prox=Math.max(0,1-dist/(PH*.1));
+      bright=0.18+iSt.strumVol*prox*2.5;
+    } else if(iSt.strumVol>0){
+      bright=0.18+iSt.strumVol;
+    }
+    bright=Math.min(bright,1);
+    pG.save();pG.shadowColor=ch.c;pG.shadowBlur=2+bright*28;
+    pG.beginPath();pG.moveTo(PW*.04,sy);pG.lineTo(PW*.96,sy);
+    pG.strokeStyle=ch.c+hx(bright*255);
+    pG.lineWidth=.7+(nStrings-i)*.28;pG.stroke();pG.restore();
+  }
+
+  // Chord name — ALWAYS fully visible, cg just adds pulse glow
+  pG.save();
+  pG.font=`bold ${48+~~(iSt.cg*14)}px Orbitron,monospace`;
+  pG.fillStyle=ch.c; // always full opacity
+  pG.shadowColor=ch.c;pG.shadowBlur=12+iSt.cg*30;
+  pG.textAlign='center';pG.textBaseline='top';
+  pG.fillText(ch.n,PW*.5,PH*.04);pG.restore();
+
+  // Chord selector buttons — always fully visible
+  Object.keys(CHRD).forEach((k,i)=>{
+    const cd=CHRD[k],act=iSt.ch===k;
+    const bx=PW*.04,by=PH*(.1+i*.1);
+    pG.save();
+    pG.strokeStyle=act?cd.c:'rgba(168,196,224,.5)';pG.lineWidth=act?2:1;
+    pG.fillStyle=act?cd.c+'33':'rgba(8,13,26,.8)';
+    pG.fillRect(bx,by,70,28);pG.strokeRect(bx,by,70,28);
+    pG.font=`bold ${act?13:11}px Orbitron,monospace`;
+    pG.fillStyle=act?cd.c:'rgba(168,196,224,.8)'; // always readable
+    pG.textAlign='center';pG.textBaseline='middle';pG.fillText(k,bx+35,by+14);
+    pG.restore();
+  });
+
+  // Strum speed bar
+  const barW=PW*.3,barH=5,barX=PW*.35,barY=PH*.93;
+  pG.fillStyle='rgba(255,208,0,.15)';pG.fillRect(barX,barY,barW,barH);
+  if(iSt.strumVol>0){
+    pG.fillStyle=`rgba(255,208,0,${.5+iSt.strumVol})`;
+    pG.fillRect(barX,barY,barW*(iSt.strumVol/.35),barH);
+  }
+  pG.font='9px Rajdhani,sans-serif';pG.fillStyle='rgba(168,196,224,.45)';
+  pG.textAlign='center';pG.textBaseline='bottom';
+  pG.fillText('LEFT PINCH = CHORD (C/G/D/Am)   RIGHT HAND MOVE = STRUM',PW*.5,PH*.99);
+}
+
+// ═══ PIANO — full visible keyboard, fingertip touch ═══
+// Full 2-octave scale C3→B4 (15 white keys + 10 black keys)
+const WKEYS=[
+  {n:'C3',f:130.8},{n:'D3',f:146.8},{n:'E3',f:164.8},{n:'F3',f:174.6},
+  {n:'G3',f:196.0},{n:'A3',f:220.0},{n:'B3',f:246.9},
+  {n:'C4',f:261.6},{n:'D4',f:293.7},{n:'E4',f:329.6},{n:'F4',f:349.2},
+  {n:'G4',f:392.0},{n:'A4',f:440.0},{n:'B4',f:493.9},
+  {n:'C5',f:523.3}
+];
+// Black key positions: index into white keys (between i and i+1), semitone
+const BKEYS=[
+  {w:0,n:'C#3',f:138.6},{w:1,n:'D#3',f:155.6},{w:3,n:'F#3',f:185.0},
+  {w:4,n:'G#3',f:207.7},{w:5,n:'A#3',f:233.1},
+  {w:7,n:'C#4',f:277.2},{w:8,n:'D#4',f:311.1},{w:10,n:'F#4',f:370.0},
+  {w:11,n:'G#4',f:415.3},{w:12,n:'A#4',f:466.2}
+];
+const FINGER_LM=[4,8,12,16,20]; // thumb, index, middle, ring, pinky
+const FINGER_COLS=['#ff2d6b','#ffd000','#00f5ff','#44ff88','#aa44ff'];
+
+function initPiano(){
+  iSt.keyGlow=Array(WKEYS.length).fill(0);
+  iSt.bKeyGlow=Array(BKEYS.length).fill(0);
+  iSt.heldKeys=new Set();
+  iSt.fingerPos=[];
+  iSt.layout=null; // will be computed lazily on first updPiano call
+}
+
+function computePianoLayout(){
+  const margin=PW*.015;
+  const totalW=PW-margin*2;
+  const wW=totalW/WKEYS.length;
+  const wH=Math.min(PH*.22, 120); // max 120px tall — compact
+  const ky=(PH-wH)/2;              // exactly vertically centered
+  const whites=WKEYS.map((k,i)=>({...k,x:margin+i*wW,y:ky,w:wW-2,h:wH}));
+  const bW=wW*.52,bH=wH*.55;
+  const blacks=BKEYS.map(b=>({...b,x:margin+(b.w+1)*wW-bW/2,y:ky,w:bW,h:bH}));
+  return{whites,blacks,wW,wH,ky};
+}
+
+function updPiano(){
+  if(PW===0||PH===0)return;
+  if(!iSt.layout)iSt.layout=computePianoLayout();
+  const lay=iSt.layout;
+
+  iSt.keyGlow=iSt.keyGlow.map(g=>Math.max(0,g-.05));
+  iSt.bKeyGlow=iSt.bKeyGlow.map(g=>Math.max(0,g-.05));
+  iSt.fingerPos=[];
+
+  // Track which finger+key combos are held THIS frame
+  const newHeld=new Set();
+
+  for(let hi=0;hi<LM.length;hi++){
+    const lm=LM[hi];
+    for(let f=0;f<5;f++){
+      const fp=lm[FINGER_LM[f]];
+      const fx=(1-fp.x)*PW, fy=fp.y*PH;
+      iSt.fingerPos.push({x:fx,y:fy,col:FINGER_COLS[f]});
+
+      // Check black keys FIRST — they take priority
+      let onBlack=false;
+      for(let b=0;b<lay.blacks.length;b++){
+        const k=lay.blacks[b];
+        if(fx>=k.x&&fx<=k.x+k.w&&fy>=k.y&&fy<=k.y+k.h){
+          iSt.bKeyGlow[b]=1;
+          // Unique ID = hand index + finger index + key — stable across frames
+          const id=`b${b}h${hi}f${f}`;
+          newHeld.add(id);
+          onBlack=true;
+          // Only play on FIRST contact, not while holding
+          if(!iSt.heldKeys.has(id)){
+            note(k.f,1.2,.52);addFX(fx,fy,22,22,FINGER_COLS[f]);hit();
+          }
+          break; // one black key max per finger
+        }
+      }
+      if(!onBlack){
+        for(let w=0;w<lay.whites.length;w++){
+          const k=lay.whites[w];
+          if(fx>=k.x&&fx<=k.x+k.w&&fy>=k.y&&fy<=k.y+k.h){
+            iSt.keyGlow[w]=1;
+            const id=`w${w}h${hi}f${f}`;
+            newHeld.add(id);
+            if(!iSt.heldKeys.has(id)){
+              note(k.f,1.2,.48);addFX(fx,fy,24,24,FINGER_COLS[f]);hit();
+            }
+            break; // one white key max per finger
+          }
+        }
+      }
+    }
+  }
+  // Update held set — keys removed from set will retrigger on next entry
+  iSt.heldKeys=newHeld;
+}
+
+function drwPiano(){
+  if(!iSt.layout)return;
+  const lay=iSt.layout;
+
+  // Background panel behind keys
+  pG.fillStyle='rgba(4,7,15,.7)';
+  pG.fillRect(PW*.015,lay.ky-8,PW*.97,lay.wH+16);
+  pG.strokeStyle='rgba(0,245,255,.15)';pG.lineWidth=1;
+  pG.strokeRect(PW*.015,lay.ky-8,PW*.97,lay.wH+16);
+
+  // White keys
+  for(let i=0;i<lay.whites.length;i++){
+    const k=lay.whites[i],g=iSt.keyGlow[i];
+    pG.save();
+    if(g>0){pG.shadowColor='#00f5ff';pG.shadowBlur=15+g*20;}
+    // Key body
+    const grad=pG.createLinearGradient(k.x,k.y,k.x,k.y+k.h);
+    grad.addColorStop(0,`rgba(200,220,255,${.12+g*.5})`);
+    grad.addColorStop(1,`rgba(100,140,200,${.06+g*.3})`);
+    pG.fillStyle=grad;pG.fillRect(k.x,k.y,k.w,k.h);
+    // Border
+    pG.strokeStyle=`rgba(0,245,255,${.25+g*.75})`;pG.lineWidth=g>0?2:1;
+    pG.strokeRect(k.x,k.y,k.w,k.h);
+    // Note label
+    pG.font=`bold ${g>0?11:9}px Orbitron,monospace`;
+    pG.fillStyle=`rgba(168,196,224,${.5+g*.5})`;
+    pG.textAlign='center';pG.textBaseline='bottom';
+    pG.fillText(k.n.replace(/\d/,''),k.x+k.w/2,k.y+k.h-4);
+    pG.restore();
+  }
+
+  // Black keys (drawn on top)
+  for(let i=0;i<lay.blacks.length;i++){
+    const k=lay.blacks[i],g=iSt.bKeyGlow[i];
+    pG.save();
+    if(g>0){pG.shadowColor='#ff0077';pG.shadowBlur=14+g*18;}
+    const grad=pG.createLinearGradient(k.x,k.y,k.x,k.y+k.h);
+    grad.addColorStop(0,`rgba(20,30,50,${.85+g*.15})`);
+    grad.addColorStop(1,`rgba(8,12,24,${.9})`);
+    pG.fillStyle=grad;pG.fillRect(k.x,k.y,k.w,k.h);
+    if(g>0){pG.fillStyle=`rgba(255,0,119,${g*.3})`;pG.fillRect(k.x,k.y,k.w,k.h);}
+    pG.strokeStyle=`rgba(255,0,119,${.3+g*.7})`;pG.lineWidth=g>0?2:1;
+    pG.strokeRect(k.x,k.y,k.w,k.h);
+    pG.restore();
+  }
+
+  // Octave separators
+  [7,14].forEach(idx=>{
+    if(lay.whites[idx]){
+      const x=lay.whites[idx].x;
+      pG.strokeStyle='rgba(0,245,255,.2)';pG.lineWidth=1;pG.setLineDash([3,3]);
+      pG.beginPath();pG.moveTo(x,lay.ky-8);pG.lineTo(x,lay.ky+lay.wH+8);pG.stroke();
+      pG.setLineDash([]);
+    }
+  });
+
+  // Finger dots floating above keyboard
+  for(const fp of iSt.fingerPos){
+    pG.save();pG.shadowColor=fp.col;pG.shadowBlur=18;
+    pG.beginPath();pG.arc(fp.x,fp.y,8,0,Math.PI*2);
+    pG.fillStyle=fp.col+'cc';pG.fill();
+    pG.strokeStyle=fp.col;pG.lineWidth=2;pG.stroke();
+    pG.restore();
+  }
+
+  // Hint below keyboard
+  const hintY=lay.ky+lay.wH+22;
+  pG.font='bold 10px Orbitron,monospace';pG.fillStyle='rgba(168,196,224,.45)';
+  pG.textAlign='center';pG.textBaseline='top';
+  pG.fillText('MOVE FINGERS INTO THE KEYS TO PLAY — EACH FINGER PLAYS A DIFFERENT KEY',PW*.5,hintY);
+  tip('ALL 10 FINGERS TRACKED — BLACK KEYS TAKE PRIORITY OVER WHITE');
+}
+
+// ── SHARED DRAW UTILS ─────────────────────────────────
+function addFX(x,y,rx,ry,col){fx.push({x,y,rx,ry:ry||rx,col,a:.88});}
+function drwFX(){fx=fx.filter(e=>e.a>0);for(const e of fx){pG.save();pG.beginPath();pG.ellipse(e.x,e.y,e.rx,e.ry,0,0,Math.PI*2);pG.strokeStyle=e.col+hx(e.a*255);pG.lineWidth=2;pG.stroke();e.rx+=4.5;e.ry+=3;e.a-=.037;pG.restore();}}
+
+// Draw drumstick for drums, or simple dot for other instruments
+function drwSkel(){
+  for(let i=0;i<LM.length;i++){
+    const lm=LM[i],side=getSide(i);
+    const col=side==='left'?'#00f5ff':'#ff0077';
+    const sk=side==='left'?'l':'r';
+
+    // Key landmarks (all mirrored with 1-x)
+    const wrist  ={x:(1-lm[0].x)*PW, y:lm[0].y*PH};
+    const mKnuckle={x:(1-lm[9].x)*PW, y:lm[9].y*PH};
+    const mTip   ={x:(1-lm[12].x)*PW, y:lm[12].y*PH};
+
+    if(inst==='drums'){
+      // Stick direction: from wrist → through middle knuckle → beyond tip
+      const dx=mTip.x-wrist.x, dy=mTip.y-wrist.y;
+      const len=Math.hypot(dx,dy)||1;
+      const nx=dx/len, ny=dy/len;
+
+      // Handle end (behind wrist, opposite direction)
+      const handleLen=PH*0.07;
+      const hx2=wrist.x-nx*handleLen, hy2=wrist.y-ny*handleLen;
+
+      // Tip end (extended well beyond fingertip)
+      const tipLen=PH*0.12;
+      const ex=mTip.x+nx*tipLen, ey=mTip.y+ny*tipLen;
+
+      pG.save();
+      pG.shadowColor=col; pG.shadowBlur=14;
+      // Stick body gradient — dark at handle, bright at tip
+      const grad=pG.createLinearGradient(hx2,hy2,ex,ey);
+      grad.addColorStop(0,'rgba(60,60,60,.7)');
+      grad.addColorStop(0.5,'rgba(140,140,140,.85)');
+      grad.addColorStop(0.85,col+'dd');
+      grad.addColorStop(1,col);
+      pG.beginPath();pG.moveTo(hx2,hy2);pG.lineTo(ex,ey);
+      pG.strokeStyle=grad;pG.lineWidth=5;pG.lineCap='round';pG.stroke();
+
+      // Glowing tip ball
+      pG.shadowBlur=22;
+      pG.beginPath();pG.arc(ex,ey,8,0,Math.PI*2);
+      pG.fillStyle=col;pG.fill();
+
+      // Handle knob
+      pG.shadowBlur=0;
+      pG.beginPath();pG.arc(hx2,hy2,5,0,Math.PI*2);
+      pG.fillStyle='rgba(180,180,180,.6)';pG.fill();
+      pG.restore();
+
+    } else {
+      // Other instruments — small glowing dot at index fingertip
+      const idx={x:(1-lm[8].x)*PW, y:lm[8].y*PH};
+      pG.save();pG.shadowColor=col;pG.shadowBlur=16;
+      pG.beginPath();pG.arc(idx.x,idx.y,7,0,Math.PI*2);
+      pG.fillStyle=col;pG.fill();pG.restore();
+    }
+  }
+}
+function tip(t){pG.font='9px Rajdhani,sans-serif';pG.fillStyle='rgba(168,196,224,.38)';pG.textAlign='center';pG.textBaseline='bottom';pG.fillText(t,PW/2,PH*.995);}
+function hit(){notes++;document.getElementById('sN').textContent=notes;const now=Date.now();streak=now-lastT<900?streak+1:1;lastT=now;document.getElementById('sS').textContent=streak;}
+function hx(v){return Math.round(Math.max(0,Math.min(255,v))).toString(16).padStart(2,'0');}
+
+// ── PLAY LOOP ─────────────────────────────────────────
+function pLoop(){
+  requestAnimationFrame(pLoop);
+  if(!document.getElementById('s4').classList.contains('active'))return;
+  if(!PW||!PH)return;
+  pG.clearRect(0,0,PW,PH);
+  if(inst==='drums'){updDrums();drwDrums();drwSkel();drwFX();}
+  else if(inst==='harp'){updHarp();drwHarp();drwSkel();drwFX();}
+  else if(inst==='guitar'){updGuitar();drwGuitar();drwSkel();drwFX();}
+  else if(inst==='piano'){updPiano();drwPiano();drwSkel();drwFX();}
+}
+</script>
+</body>
+</html>
